@@ -137,12 +137,13 @@ class MultiHeadSelfAttention(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, d_ff: int, theta: float):
+    def __init__(self, d_model: int, num_heads: int, d_ff: int, theta: float, device: torch.device = None):
         super(TransformerBlock, self).__init__()
         self.d_model = d_model ## dimensionality of the Transformer block inputs
         self.num_heads = num_heads ## Number of heads to use in multi-head self-attention
         self.d_ff = d_ff ## Dimensionality of the position-wise feed-forward inner layer
-        self.rope = RoPE(theta = theta, d_k = self.d_model // self.num_heads)
+        self.device = device if device is not None else torch.device("cpu")
+        self.rope = RoPE(theta = theta, d_k = self.d_model // self.num_heads, device=self.device)
 
         self.ln1 = RMSNorm(self.d_model)
         self.attn = MultiHeadSelfAttention(self.d_model, self.num_heads, rope=self.rope)
@@ -159,7 +160,7 @@ class TransformerBlock(nn.Module):
     
 
 class TransformerLM(nn.Module):
-    def __init__(self, vocab_size: int, context_length: int, d_model: int, num_layers: int, num_heads: int, d_ff: int, rope_theta: float):
+    def __init__(self, vocab_size: int, context_length: int, d_model: int, num_layers: int, num_heads: int, d_ff: int, rope_theta: float, device: torch.device = None):
         super(TransformerLM, self).__init__()
         self.vocab_size = vocab_size
         self.context_length = context_length
@@ -168,9 +169,10 @@ class TransformerLM(nn.Module):
         self.num_heads = num_heads
         self.d_ff = d_ff
         self.rope_theta = rope_theta
+        self.device = device if device is not None else torch.device("cpu")
 
         self.token_embeddings = Embedding(num_embeddings=vocab_size, embedding_dim=d_model) ## Input token embedding
-        self.layers = nn.ModuleList([TransformerBlock(d_model=d_model, num_heads=num_heads, d_ff=d_ff, theta=rope_theta) for _ in range(num_layers)]) ## layers of transformer blocks
+        self.layers = nn.ModuleList([TransformerBlock(d_model=d_model, num_heads=num_heads, d_ff=d_ff, theta=rope_theta, device=self.device) for _ in range(num_layers)]) ## layers of transformer blocks
         self.ln_final = RMSNorm(self.d_model) ## RMSNorm applied to the output of the final transformer block
         self.lm_head = LinearModule(self.d_model, self.vocab_size) ## Linear layer to project to vocabulary size
     
