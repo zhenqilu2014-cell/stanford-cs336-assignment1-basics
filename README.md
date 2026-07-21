@@ -48,3 +48,31 @@ gunzip owt_valid.txt.gz
 cd ..
 ```
 
+## Implementation Summary
+
+This repository contains my implementation of the CS336 Assignment 1
+components across four modules under `src/`:
+
+- **`tokenizer.py` / `train_bpe.py`** — BPE tokenizer supporting training,
+  encoding, decoding, and special tokens (e.g., `<|endoftext|>`), with
+  parallelized pretokenization.
+
+- **`models.py`** — Transformer language model built from scratch:
+  `LinearModule`, `Embedding`, `RMSNorm`, `SwiGLU`, `RoPE`,
+  `MultiHeadSelfAttention` (causal masking), `TransformerBlock`, and
+  `TransformerLM`.
+
+- **`utils.py`** — Utility functions for scaled dot-product attention,
+  cross-entropy loss, temperature-softmax, top-p (nucleus) sampling,
+  warmup + cosine-decay learning rate scheduling, gradient clipping,
+  data loading, and checkpoint save/load.
+
+- **`optimizers.py`** — Custom implementations of SGD (with normalized
+  step size) and AdamW (with weight decay and bias-corrected moment
+  estimates).
+
+All components are wired to the provided test suite via
+`tests/adapters.py`. Ad-hoc scripts under `unitest/` include
+`test_run_bpe.py` / `test_run_tokenizer.py` for tokenizer validation,
+and `model_infer.py` / `model_train.py` for end-to-end inference
+and training.
