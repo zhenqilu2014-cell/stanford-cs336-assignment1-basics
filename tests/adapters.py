@@ -16,6 +16,7 @@ from tokenizer import Tokenizer
 from train_bpe import train_bpe
 from models import *
 from utils import *
+from optimizers import *
 
 def run_linear(
     d_in: int,
@@ -35,7 +36,6 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-    
 
     model = LinearModule(d_in, d_out)
     model.load_state_dict({"weight": weights})
@@ -118,7 +118,7 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    return scaled_dot_product_attention(query = Q, key = K, value = V, mask = ~mask)
+    return scaled_dot_product_attention(Q, K, V, mask = mask)
 
 
 def run_multihead_self_attention(
@@ -219,7 +219,7 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    model = RoPE(theta, d_k)
+    model = RoPE(theta, d_k, max_seq_len)
     return model(in_query_or_key, token_positions)
 
 
@@ -293,7 +293,8 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    model = TransformerBlock(d_model=d_model, num_heads=num_heads, d_ff=d_ff, theta=theta)
+    rope = RoPE(theta = theta, d_k = d_model // num_heads)
+    model = TransformerBlock(d_model=d_model, num_heads=num_heads, d_ff=d_ff, rope=rope)
     model.load_state_dict(weights)
     return model(in_features)
 
@@ -377,7 +378,16 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    model = TransformerLM(vocab_size=vocab_size, context_length=context_length, d_model=d_model, num_layers=num_layers, num_heads=num_heads, d_ff=d_ff, rope_theta=rope_theta)
+    rope = RoPE(theta = rope_theta, d_k = d_model // num_heads)
+    model = TransformerLM(
+        vocab_size = vocab_size, 
+        context_length = context_length, 
+        d_model = d_model, 
+        num_layers = num_layers, 
+        num_heads = num_heads, 
+        d_ff = d_ff, 
+        rope = rope
+    )
     model.load_state_dict(weights)
     return model(in_indices)
 
@@ -403,7 +413,7 @@ def run_rmsnorm(
         RMSNorm of the `in_features`.
     """
     model = RMSNorm(d_model, eps)
-    model.load_state_dict({"weights": weights})
+    model.load_state_dict({"weight": weights})
     return model(in_features)
 
 
@@ -441,7 +451,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return get_batch(dataset=dataset, batch_size=batch_size, context_length=context_length, device=device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
@@ -487,14 +497,14 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    return gradient_clipping(parameters=parameters, max_l2_norm=max_l2_norm)
 
 
 def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return AdamW
 
 
 def run_get_lr_cosine_schedule(
@@ -522,7 +532,7 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+    return learning_rate_schedule(lr_max=max_learning_rate, lr_min=min_learning_rate, warmup_iters=warmup_iters, cosine_cycle_iters=cosine_cycle_iters, current_iter=it)
 
 
 def run_save_checkpoint(
@@ -541,7 +551,7 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    save_checkpoint(model=model, optimizer=optimizer, iteration=iteration, out=out)
 
 
 def run_load_checkpoint(
@@ -562,7 +572,7 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    return load_checkpoint(src=src, model=model, optimizer=optimizer)
 
 
 def get_tokenizer(
